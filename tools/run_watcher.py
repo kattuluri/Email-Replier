@@ -1,10 +1,10 @@
 """
-Email watcher — polls Gmail every 60 seconds and runs the pipeline
-automatically when new Primary inbox emails arrive.
+Email watcher — polls Gmail every 60 seconds for all registered users
+and runs the pipeline automatically when new Primary inbox emails arrive.
 
 Usage:
     python tools/run_watcher.py
-    python tools/run_watcher.py --interval 30   # check every 30 seconds
+    python tools/run_watcher.py --interval 30
 
 Stop with Ctrl+C.
 """
@@ -17,6 +17,7 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(__file__))
 from gmail_auth import get_gmail_service
 from run_pipeline import run as run_pipeline
+from user_store import get_users
 
 PROCESSED_LABEL = 'email-replier-processed'
 SKIP_CATEGORIES = {'CATEGORY_PROMOTIONS', 'CATEGORY_UPDATES', 'CATEGORY_SOCIAL', 'CATEGORY_FORUMS'}
@@ -32,17 +33,15 @@ def get_or_create_label(service, label_name):
 
 
 def has_new_emails(service):
-    """Return True if there are unread Primary inbox emails not yet processed."""
     get_or_create_label(service, PROCESSED_LABEL)
-    query = f'is:unread -label:{PROCESSED_LABEL}'
-    result = service.users().messages().list(userId='me', q=query, maxResults=5).execute()
-
+    result = service.users().messages().list(
+        userId='me', q=f'is:unread -label:{PROCESSED_LABEL}', maxResults=5
+    ).execute()
     for msg_ref in result.get('messages', []):
         msg = service.users().messages().get(
             userId='me', id=msg_ref['id'], format='metadata'
         ).execute()
-        label_ids = set(msg.get('labelIds', []))
-        if not (label_ids & SKIP_CATEGORIES):
+        if not (set(msg.get('labelIds', [])) & SKIP_CATEGORIES):
             return True
     return False
 
@@ -52,27 +51,44 @@ def timestamp():
 
 
 def watch(interval=60):
-    print(f'Watching inbox every {interval}s. Press Ctrl+C to stop.\n')
+    users = get_users()
+    if not users:
+        print('No users registered. Run: python tools/add_user.py <email>')
+        return
 
-    service = get_gmail_service()
+    print(f'Watching {len(users)} user(s) every {interval}s. Press Ctrl+C to stop.')
+    print(f'Users: {", ".join(users)}\n')
+
+    # Pre-authenticate all users so first poll is fast
+    services = {}
+    for email in users:
+        try:
+            services[email] = get_gmail_service(user_email=email)
+            print(f'  Authenticated: {email}', flush=True)
+        except Exception as e:
+            print(f'  Auth failed for {email}: {e}', flush=True)
+    print()
 
     while True:
         try:
-            if has_new_emails(service):
-                print(f'[{timestamp()}] New email detected — running pipeline...', flush=True)
-                run_pipeline()
-                print(f'[{timestamp()}] Done. Resuming watch.\n', flush=True)
-            else:
-                print(f'[{timestamp()}] No new emails.', end='\r', flush=True)
+            for email in users:
+                service = services.get(email)
+                if not service:
+                    continue
+                try:
+                    if has_new_emails(service):
+                        print(f'[{timestamp()}] [{email}] New email — running pipeline...', flush=True)
+                        run_pipeline(email)
+                        print(f'[{timestamp()}] [{email}] Done.\n', flush=True)
+                except Exception as e:
+                    print(f'[{timestamp()}] [{email}] Error: {e}', flush=True)
 
+            print(f'[{timestamp()}] Checked {len(users)} user(s).', end='\r', flush=True)
             time.sleep(interval)
 
         except KeyboardInterrupt:
             print(f'\n[{timestamp()}] Watcher stopped.')
             break
-        except Exception as e:
-            print(f'[{timestamp()}] Error: {e} — retrying in {interval}s')
-            time.sleep(interval)
 
 
 if __name__ == '__main__':

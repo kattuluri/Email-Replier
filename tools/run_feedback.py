@@ -7,12 +7,12 @@ from gmail_check_feedback import check_feedback
 from rag_update import add_to_rag
 
 
-def run():
-    print('Checking draft feedback...')
-    results = check_feedback()
+def run(user_email):
+    print(f'[{user_email}] Checking draft feedback...')
+    results = check_feedback(user_email)
 
     if not results:
-        print('No feedback to process.')
+        print(f'[{user_email}] No feedback to process.')
         return
 
     sent = feedback = deleted = 0
@@ -31,6 +31,7 @@ def run():
             add_to_rag(
                 email_text=email_text,
                 reply_text=reply_text,
+                user_email=user_email,
                 feedback=None,
                 source='approved',
                 message_id=original['id'],
@@ -42,6 +43,7 @@ def run():
             add_to_rag(
                 email_text=email_text,
                 reply_text=item['generated_reply'],
+                user_email=user_email,
                 feedback=item['feedback'],
                 source='feedback',
                 message_id=original['id'],
@@ -53,8 +55,11 @@ def run():
             print(f"  [DELETED]  {original['subject'][:60]} (skipped)")
             deleted += 1
 
-    print(f'\nDone. {sent} sent, {feedback} with feedback, {deleted} deleted.')
+    print(f'[{user_email}] Done. {sent} sent, {feedback} with feedback, {deleted} deleted.')
 
 
 if __name__ == '__main__':
-    run()
+    if len(sys.argv) < 2:
+        print('Usage: python run_feedback.py <user_email>')
+        sys.exit(1)
+    run(sys.argv[1])

@@ -7,9 +7,9 @@ sys.path.insert(0, os.path.dirname(__file__))
 from gmail_auth import get_gmail_service
 
 
-def fetch_sent_email_pairs(max_results=100):
+def fetch_sent_email_pairs(user_email, max_results=100):
     """Return list of {original_email, reply} dicts from the sent folder."""
-    service = get_gmail_service()
+    service = get_gmail_service(user_email=user_email)
 
     result = service.users().messages().list(
         userId='me', labelIds=['SENT'], maxResults=max_results
@@ -64,8 +64,10 @@ def extract_body(payload):
 
 
 if __name__ == '__main__':
-    pairs = fetch_sent_email_pairs(max_results=50)
-    print(f'Found {len(pairs)} email-reply pairs')
+    import sys as _sys
+    user = _sys.argv[1] if len(_sys.argv) > 1 else None
+    pairs = fetch_sent_email_pairs(user_email=user, max_results=50)
+    print(f'Found {len(pairs)} email-reply pairs for {user}')
     for p in pairs[:3]:
         print(f"  Original: {p['original_email']['subject']}")
         print(f"  Reply snippet: {p['reply']['body'][:80].strip()}")

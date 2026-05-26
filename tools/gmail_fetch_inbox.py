@@ -30,8 +30,8 @@ def is_no_reply(from_address):
     return any(pattern in addr for pattern in NO_REPLY_PATTERNS)
 
 
-def fetch_unread_emails(max_results=20):
-    service = get_gmail_service()
+def fetch_unread_emails(user_email, max_results=20):
+    service = get_gmail_service(user_email=user_email)
     label_id = get_or_create_label(service, PROCESSED_LABEL)
 
     SKIP_CATEGORIES = {'CATEGORY_PROMOTIONS', 'CATEGORY_UPDATES', 'CATEGORY_SOCIAL', 'CATEGORY_FORUMS'}
@@ -83,7 +83,9 @@ def extract_body(payload):
 
 
 if __name__ == '__main__':
-    emails, _, _ = fetch_unread_emails()
+    import sys as _sys
+    user = _sys.argv[1] if len(_sys.argv) > 1 else None
+    emails, _, _ = fetch_unread_emails(user_email=user)
     print(f'Found {len(emails)} unread emails')
     for e in emails:
         print(f"  [{e['from']}] {e['subject']}")

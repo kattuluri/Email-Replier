@@ -7,17 +7,19 @@ import chromadb
 from chromadb.utils import embedding_functions
 
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'chroma_db')
-COLLECTION_NAME = 'email_replies'
 
 
-def get_collection():
+def get_collection(user_email):
+    from user_store import user_id
     client = chromadb.PersistentClient(path=DB_PATH)
     ef = embedding_functions.DefaultEmbeddingFunction()
-    return client.get_or_create_collection(name=COLLECTION_NAME, embedding_function=ef)
+    return client.get_or_create_collection(
+        name=f'replies_{user_id(user_email)}', embedding_function=ef
+    )
 
 
-def query_similar_emails(email_text, n_results=5):
-    collection = get_collection()
+def query_similar_emails(email_text, user_email, n_results=5):
+    collection = get_collection(user_email)
     count = collection.count()
     if count == 0:
         return []
@@ -46,9 +48,10 @@ def query_similar_emails(email_text, n_results=5):
 
 
 if __name__ == '__main__':
-    query = sys.argv[1] if len(sys.argv) > 1 else 'Can we schedule a meeting to discuss the project?'
-    results = query_similar_emails(query)
-    print(f'Found {len(results)} similar emails for: "{query}"')
+    user = sys.argv[1] if len(sys.argv) > 1 else 'test@example.com'
+    query = sys.argv[2] if len(sys.argv) > 2 else 'Can we schedule a meeting to discuss the project?'
+    results = query_similar_emails(query, user_email=user)
+    print(f'Found {len(results)} similar emails for {user}: "{query}"')
     for r in results:
         print(f'  Distance: {r["distance"]:.3f}')
         print(f'  Email: {r["email_text"][:100].strip()}')

@@ -12,14 +12,14 @@ from rag_query import query_similar_emails
 client = anthropic.Anthropic()
 
 
-def generate_reply(email_data):
+def generate_reply(email_data, user_email):
     email_text = (
         f"Subject: {email_data['subject']}\n"
         f"From: {email_data['from']}\n\n"
         f"{email_data['body'][:4000]}"
     )
 
-    similar = query_similar_emails(email_text, n_results=5)
+    similar = query_similar_emails(email_text, user_email=user_email, n_results=5)
 
     examples_block = _build_examples(similar)
 
@@ -67,11 +67,13 @@ def _build_examples(similar):
 
 
 if __name__ == '__main__':
+    import sys as _sys
+    user = _sys.argv[1] if len(_sys.argv) > 1 else 'test@example.com'
     test_email = {
         'subject': 'Quick question about the project',
-        'from': 'test@example.com',
+        'from': 'someone@example.com',
         'body': 'Hi, just wanted to check in on the status of the project. Can you give me an update?',
     }
-    reply = generate_reply(test_email)
+    reply = generate_reply(test_email, user_email=user)
     print('Generated reply:')
     print(reply)

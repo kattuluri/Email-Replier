@@ -15,12 +15,14 @@ SCOPES = [
 ROOT = os.path.join(os.path.dirname(__file__), '..')
 
 
-def get_gmail_service(
-    credentials_path=None,
-    token_path=None,
-):
+def get_gmail_service(user_email=None, credentials_path=None, token_path=None):
+    import sys
+    sys.path.insert(0, os.path.dirname(__file__))
+    from user_store import token_path as user_token_path
+
     credentials_path = credentials_path or os.path.join(ROOT, 'credentials.json')
-    token_path = token_path or os.path.join(ROOT, 'token.json')
+    if token_path is None:
+        token_path = user_token_path(user_email) if user_email else os.path.join(ROOT, 'token.json')
 
     creds = None
     if os.path.exists(token_path):
@@ -40,6 +42,8 @@ def get_gmail_service(
 
 
 if __name__ == '__main__':
-    service = get_gmail_service()
+    import sys as _sys
+    email_arg = _sys.argv[1] if len(_sys.argv) > 1 else None
+    service = get_gmail_service(user_email=email_arg)
     profile = service.users().getProfile(userId='me').execute()
     print(f"Authenticated as: {profile['emailAddress']}")

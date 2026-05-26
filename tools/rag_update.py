@@ -8,17 +8,19 @@ import chromadb
 from chromadb.utils import embedding_functions
 
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'chroma_db')
-COLLECTION_NAME = 'email_replies'
 
 
-def get_collection():
+def get_collection(user_email):
+    from user_store import user_id
     client = chromadb.PersistentClient(path=DB_PATH)
     ef = embedding_functions.DefaultEmbeddingFunction()
-    return client.get_or_create_collection(name=COLLECTION_NAME, embedding_function=ef)
+    return client.get_or_create_collection(
+        name=f'replies_{user_id(user_email)}', embedding_function=ef
+    )
 
 
-def add_to_rag(email_text, reply_text, feedback=None, source='feedback', message_id=None):
-    collection = get_collection()
+def add_to_rag(email_text, reply_text, user_email, feedback=None, source='feedback', message_id=None):
+    collection = get_collection(user_email)
     doc_id = message_id or str(uuid.uuid4())
     collection.upsert(
         ids=[doc_id],
@@ -33,11 +35,14 @@ def add_to_rag(email_text, reply_text, feedback=None, source='feedback', message
 
 
 if __name__ == '__main__':
+    import sys as _sys
+    test_email = _sys.argv[1] if len(_sys.argv) > 1 else 'test@example.com'
     doc_id = add_to_rag(
         email_text='Test email about a project update',
         reply_text='Thanks for the update. I will review and get back to you.',
+        user_email=test_email,
         source='test',
     )
     print(f'Added: {doc_id}')
-    collection = get_collection()
-    print(f'Total entries: {collection.count()}')
+    collection = get_collection(test_email)
+    print(f'Total entries for {test_email}: {collection.count()}')

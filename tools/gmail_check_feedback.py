@@ -7,26 +7,27 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 from gmail_auth import get_gmail_service
 
-PENDING_DRAFTS_FILE = os.path.join(os.path.dirname(__file__), '..', '.tmp', 'pending_drafts.json')
 FEEDBACK_PREFIX = '[FEEDBACK]'
 
 
-def load_pending():
-    if not os.path.exists(PENDING_DRAFTS_FILE):
+def load_pending(user_email):
+    from user_store import pending_drafts_path
+    path = pending_drafts_path(user_email)
+    if not os.path.exists(path):
         return []
-    with open(PENDING_DRAFTS_FILE) as f:
+    with open(path) as f:
         return json.load(f)
 
 
-def save_pending(drafts):
-    os.makedirs(os.path.dirname(PENDING_DRAFTS_FILE), exist_ok=True)
-    with open(PENDING_DRAFTS_FILE, 'w') as f:
+def save_pending(user_email, drafts):
+    from user_store import pending_drafts_path
+    with open(pending_drafts_path(user_email), 'w') as f:
         json.dump(drafts, f, indent=2)
 
 
-def check_feedback():
-    service = get_gmail_service()
-    pending = load_pending()
+def check_feedback(user_email):
+    service = get_gmail_service(user_email=user_email)
+    pending = load_pending(user_email)
 
     results = []
     still_pending = []
@@ -100,7 +101,7 @@ def check_feedback():
                 else:
                     still_pending.append(entry)
 
-    save_pending(still_pending)
+    save_pending(user_email, still_pending)
     return results
 
 
@@ -115,7 +116,11 @@ def extract_body(msg):
 
 
 if __name__ == '__main__':
-    results = check_feedback()
+    import sys as _sys
+    if len(_sys.argv) < 2:
+        print('Usage: python gmail_check_feedback.py <user_email>')
+        _sys.exit(1)
+    results = check_feedback(_sys.argv[1])
     print(f'Resolved {len(results)} drafts')
     for r in results:
         print(f"  [{r['status'].upper()}] {r['original_email']['subject'][:60]}")
